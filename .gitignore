@@ -1,0 +1,37 @@
+# Python
+/__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.so
+.Python
+
+# Virtual envs
+/.venv/
+/venv/
+/env/
+/.env
+
+# Tests / coverage
+/.pytest_cache/
+/.coverage
+/htmlcov/
+/.tox/
+/.nox/
+
+# IDE
+/.vscode/
+/.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Per-machine AI tool config (rule travels with the repo)
+# .claude/ and .codex/ are Claude/Codex desktop caches; safe to ignore.
+/.claude/
+/.codex/

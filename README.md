@@ -1,14 +1,14 @@
 # neil-skills
 
-本仓库收录 Neil 常用的 Claude Code Skills。每个 skill 是一个独立的目录，包含一个 `SKILL.md` 文件，定义了该 skill 的名称、适用场景与详细行为规范。
+本仓库收录 Neil 常用的 Claude Code Skills。每个 skill 是一个独立的目录，包含一个 `SKILL.md` 文件（YAML frontmatter + 行为规范）、`scripts/` 实现、以及 `tests/` 回归测试套件。
 
-仓库同时作为 **Codex marketplace bundle** 打包：`plugins/neil-skills/` 是插件根，`plugins/neil-skills/.codex-plugin/plugin.json` 是 bundle 清单。`setup-marketplace.ps1` 在本机注册该 bundle 作为本地 Codex 插件源。
+仓库同时作为 **Claude Code skills 集合**使用：根目录下任何一个含 `SKILL.md` 的目录都会被 Claude Code 的 skill loader 自动发现并加载。
 
 ## Skills 列表
 
 ### git-commit-helper
 
-- **路径**：`plugins/neil-skills/git-commit-helper/SKILL.md`
+- **路径**：`git-commit-helper/SKILL.md`
 - **触发场景**：当 AI 代表用户执行 `git commit` 时使用 —— 始终先读取当前仓库的 git identity（`--local` 优先，fallback `--global`），通过 `--author` 在 `user.name` 末尾追加 `(Ai)` 后缀；绝不通过 `-c` 参数覆盖身份；绝不临时修改 `git config`；绝不允许任何形式的 `git push`。
 
 **核心规则**：
@@ -24,19 +24,18 @@
 调用仓库自带的 `scripts/ai_commit.py` 脚本提交，避免手工 `git commit` 漂移。脚本在 identity 为 placeholder 时会主动拒绝。
 
 ```bash
-python plugins/neil-skills/git-commit-helper/scripts/ai_commit.py \
+python git-commit-helper/scripts/ai_commit.py \
     "feat(feature/login): 新增登录功能" \
     --feat-name "登录功能" \
-    --body "- 新增 src/auth/login.ts，校验用户名是否存在
-- 新增 src/auth/password.ts，校验登录密码是否正确"
+    --message-file MSG.txt
 
-# 或：把 message 写到文件里
-python plugins/neil-skills/git-commit-helper/scripts/ai_commit.py --message-file MSG.txt
+# 或：把整条 message 写到文件里（推荐，跨行更稳）
+python git-commit-helper/scripts/ai_commit.py --message-file MSG.txt
 ```
 
 ### staged-doc-naming
 
-- **路径**：`plugins/neil-skills/staged-doc-naming/SKILL.md`
+- **路径**：`staged-doc-naming/SKILL.md`
 - **触发场景**：根据源文档生成带"生命周期阶段标记"的衍生文件名时使用 —— 在源文件名的"序号"和"主体"之间插入固定阶段单词（`pm` / `dev` / `plan` / `case` / `case.data` / `实施纪要`），原扩展名保留。覆盖"需求梳理 → 开发设计 → 开发计划 → 测试计划 → 测试数据 → 实施纪要"六个文档生命周期阶段。
 
 **核心规则**：
@@ -53,16 +52,16 @@ python plugins/neil-skills/git-commit-helper/scripts/ai_commit.py --message-file
 **使用方式**：
 
 ```bash
-python plugins/neil-skills/staged-doc-naming/scripts/stage_naming.py "001.三月开发需求说明.md" pm
+python staged-doc-naming/scripts/stage_naming.py "001.三月开发需求说明.md" pm
 # -> 001.pm.三月开发需求说明.md
 
-python plugins/neil-skills/staged-doc-naming/scripts/stage_naming.py --list-stages
-python plugins/neil-skills/staged-doc-naming/scripts/stage_naming.py --exists-check "/path/to/001.pm.x.md"
+python staged-doc-naming/scripts/stage_naming.py --list-stages
+python staged-doc-naming/scripts/stage_naming.py --exists-check "/path/to/001.pm.x.md"
 ```
 
 ### list-git-repos
 
-- **路径**：`plugins/neil-skills/list-git-repos/SKILL.md`
+- **路径**：`list-git-repos/SKILL.md`
 - **触发场景**：当用户希望扫一个目录、盘点工作区、`/init` 接手新工作区、或发起跨多个 repo 的批量操作前使用 —— 用 `python scripts/list_git_repos.py` 输出一个剪枝后的 ASCII 树，每个仓库节点带当前分支名和 `*` dirty 标记。
 
 **核心规则**：
@@ -77,15 +76,15 @@ python plugins/neil-skills/staged-doc-naming/scripts/stage_naming.py --exists-ch
 
 ```bash
 # 当前工作区，含分支与 dirty 标记
-python plugins/neil-skills/list-git-repos/scripts/list_git_repos.py . --with-status
+python list-git-repos/scripts/list_git_repos.py . --with-status
 
 # 只输出绝对路径（一行一个），便于管道
-python plugins/neil-skills/list-git-repos/scripts/list_git_repos.py E:/Workspace --format paths
+python list-git-repos/scripts/list_git_repos.py E:/Workspace --format paths
 ```
 
 ### plan-doc-sequence
 
-- **路径**：`plugins/neil-skills/plan-doc-sequence/SKILL.md`
+- **路径**：`plan-doc-sequence/SKILL.md`
 - **触发场景**：当用户说"我要规划一个需求 / 一个 feat"、"按流程生成规划文档 / 生成 8 个规划文档 / 一次性把规划文档全列出来"时使用 —— 一次性生成 8 份规划文档的命名：001 原始需求 + 002-005（pm/dev/plan/case 计划阶段）+ 006 impl（实施）+ 007-008（audit/impl-note 实施后）。
 
 **核心规则**：
@@ -101,17 +100,17 @@ python plugins/neil-skills/list-git-repos/scripts/list_git_repos.py E:/Workspace
 
 ```bash
 # 生成 8 个文件名
-python plugins/neil-skills/plan-doc-sequence/scripts/plan_doc_sequence.py \
+python plan-doc-sequence/scripts/plan_doc_sequence.py \
     --feat "feat04动态改写" \
     --date 20260707
 
 # 实际创建文件：管道到 touch
-python plugins/neil-skills/plan-doc-sequence/scripts/plan_doc_sequence.py \
+python plan-doc-sequence/scripts/plan_doc_sequence.py \
     --feat "feat04动态改写" \
     --date 20260707 | xargs -I{} touch "{}"
 
 # 打印封闭序列表
-python plugins/neil-skills/plan-doc-sequence/scripts/plan_doc_sequence.py --list-sequence
+python plan-doc-sequence/scripts/plan_doc_sequence.py --list-sequence
 ```
 
 ## 目录结构
@@ -124,38 +123,41 @@ neil-skills/
 │   └── superpowers/
 │       ├── specs/                                  # 设计 spec
 │       └── plans/                                  # 实施计划
-├── plugins/
-│   └── neil-skills/                                # Codex marketplace bundle 根
-│       ├── .codex-plugin/
-│       │   └── plugin.json                         # Bundle 清单（4 个 skills）
-│       ├── git-commit-helper/
-│       │   ├── SKILL.md
-│       │   ├── scripts/ai_commit.py
-│       │   └── tests/test_ai_commit.py             # 51 个回归测试
-│       ├── staged-doc-naming/
-│       │   ├── SKILL.md
-│       │   ├── scripts/stage_naming.py
-│       │   └── tests/test_stage_naming.py          # 23 个回归测试
-│       ├── list-git-repos/
-│       │   ├── SKILL.md
-│       │   ├── scripts/list_git_repos.py
-│       │   ├── tests/test_list_git_repos.py        # 5 个回归测试
-│       │   └── docs/baseline.md                    # RED 阶段基线
-│       └── plan-doc-sequence/
-│           ├── SKILL.md
-│           ├── scripts/plan_doc_sequence.py
-│           └── tests/test_plan_doc_sequence.py     # 7 个回归测试
-├── setup-marketplace.ps1                           # 注册本仓库为本地 Codex 插件源
-├── AGENTS.md                                       # Codex agent 引导（与 CLAUDE.md 内容重叠）
-└── CLAUDE.md                                       # Claude Code agent 引导
+├── git-commit-helper/                              # git commit 辅助（51 个回归测试）
+│   ├── SKILL.md
+│   ├── scripts/ai_commit.py
+│   ├── tests/test_ai_commit.py
+│   └── docs/.gitkeep
+├── staged-doc-naming/                              # 阶段标记命名（23 个回归测试）
+│   ├── SKILL.md
+│   ├── scripts/stage_naming.py
+│   ├── tests/test_stage_naming.py
+│   └── docs/.gitkeep
+├── list-git-repos/                                 # 仓库扫描 + ASCII 树（5 个回归测试）
+│   ├── SKILL.md
+│   ├── scripts/list_git_repos.py
+│   ├── tests/test_list_git_repos.py
+│   └── docs/baseline.md                            # RED 阶段基线
+├── plan-doc-sequence/                              # 8 份规划文档命名（7 个回归测试）
+│   ├── SKILL.md
+│   ├── scripts/plan_doc_sequence.py
+│   └── tests/test_plan_doc_sequence.py
+├── AGENTS.md                                       # Codex 引导入口（单行指针，正文指向 CLAUDE.md）
+└── CLAUDE.md                                       # 仓库指南的权威文档
 ```
 
 ## 运行测试
 
 ```bash
-pytest                                              # 全部 86 个测试（pytest.ini testpaths 自动覆盖 4 个 skill 的 tests/）
-pytest plugins/neil-skills/list-git-repos/tests/ -v                     # 单个 skill 的测试集
-pytest plugins/neil-skills/git-commit-helper/tests/test_ai_commit.py::test_validate_header_rejects_issue_code_in_subject -v   # 单条
+# pytest.ini testpaths 自动覆盖全部 skill 的 tests/ —— 总计 86 个回归测试
+pytest                                              # 直接调用
+python -m pytest                                    # 等价（如果 pytest 不在 PATH）
+
+# 单个 skill 的测试集
+pytest list-git-repos/tests/ -v
+
+# 单条用例
+pytest git-commit-helper/tests/test_ai_commit.py::test_validate_header_rejects_issue_code_in_subject -v
 ```
 
 无构建步骤、无 linter、无 CI workflow。每个 skill 的 `SKILL.md` 是行为的唯一真相源，脚本是规则的可执行形式。

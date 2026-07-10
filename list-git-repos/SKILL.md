@@ -1,6 +1,6 @@
 ---
 name: list-git-repos
-description: Use when scanning a directory tree for git repositories, when /init initializes a new workspace, when auditing a workspace for cross-repo work, or when the user asks "what git repos are in this directory / 工作区 / 父目录" — runs a pruned ASCII tree scan with current branch and dirty marker per repo. Output is a tree by default; pass --format paths for one path per line. Triggers: "列举 / 列出 / 扫一下 / 盘点 / 审计 / /init 一个新工作区 / 对所有 repo 跑一遍 ...".
+description: Use when scanning a directory tree for git repositories — runs a pruned ASCII tree where each repo node shows current branch and `*` dirty marker; pure stdlib Python 3. Use cases: workspace inventory, /init onboarding a new workspace, preflight before cross-repo work, finding "where are my repos" before batch ops. Default output is a tree; pass --format paths for one absolute path per line (pipeline-friendly, forward slashes even on Windows). Triggered when the user says "扫一下这个目录里的 git 仓库 / 列出我的工作区 / 盘点 workspace / 父目录里有哪些 repo / /init 这个新工作区 / 审计跨 repo 的工作 / 哪些 repo 是 dirty 的", or asks "what git repos are here / 列举 / 列出 / 盘点 / 审计 / 对所有 repo 跑一遍".
 ---
 
 # list-git-repos

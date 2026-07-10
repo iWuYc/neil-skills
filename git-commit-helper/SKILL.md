@@ -1,6 +1,6 @@
 ---
 name: git-commit-helper
-description: Use when AI commits on the user's behalf — reads git identity (--local first, fallback --global), appends (Ai) to user.name via --author, validates the strict commit-message format (`{type}({branchName}): {abstractDescription}` header + Chinese `- ` bullet body), and refuses any push. Calls the bundled `scripts/ai_commit.py` rather than hand-rolling `git commit`. Triggered when the user says "提交一下 / commit 一下 / 帮我 commit / 提交这次改动 / 用 (Ai) 标记提交" or asks the agent to make a commit without naming a specific tool.
+description: "Use when AI commits on the user's behalf — reads git identity (--local first, fallback --global), appends (Ai) to user.name via --author, validates the strict commit-message format header (type(branchName) colon abstractDescription, with the branch name inside parens, plus a Chinese dash-bullet body), and refuses any push. Calls the bundled scripts/ai_commit.py rather than hand-rolling git commit. Triggered when the user says \"commit 一下 / 提交一下 / 帮我 commit / 提交这次改动 / 用 (Ai) 标记提交\" or asks the agent to make a commit without naming a specific tool."
 ---
 
 # Git Commit AI Identity

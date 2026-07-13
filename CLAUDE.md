@@ -6,12 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `neil-skills` is a curated collection of standalone [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills). Each skill is one self-contained subdirectory with a `SKILL.md` (frontmatter + behavior spec) plus any helper scripts and tests it ships with. The repo is a *spec + scripts* repo, not a runtime/library 鈥?there is no `setup.py`, no `package.json`, no application entry point.
 
-Four skills are currently here, each as a top-level directory (Claude Code's standard skills layout — every directory under the repo root with a `SKILL.md` is a single skill):
+Five skills are currently here, each as a top-level directory (Claude Code's standard skills layout — every directory under the repo root with a `SKILL.md` is a single skill). Layout is flat at the repo root, not nested under `plugins/neil-skills/` — the marketplace-bundle path described in the legacy "Adding a new skill" section below is no longer the convention.
 
-- `plugins/neil-skills/git-commit-helper/` — enforces the `(Ai)` author marker and the strict commit-message format. Ships `scripts/ai_commit.py`.
-- `plugins/neil-skills/staged-doc-naming/` — inserts lifecycle-stage tokens (`pm` / `dev` / `plan` / `case` / `case.data` / `实施纪要`) into derivative filenames. Ships `scripts/stage_naming.py`.
-- `plugins/neil-skills/list-git-repos/` — scans a directory tree and prints git repos as a pruned ASCII tree. Ships `docs/baseline.md` and a pytest suite under `tests/`; `scripts/list_git_repos.py` is implemented; the 5-test pytest suite is GREEN.
-- `plugins/neil-skills/plan-doc-sequence/` — generates the canonical 8-document planning sequence (001 raw + 002-005 pm/dev/plan/case + 006 impl + 007-008 audit/impl-note) in one shot. Ships `scripts/plan_doc_sequence.py` and a pytest suite under `tests/`.
+- `git-commit-helper/` — enforces the `(Ai)` author marker and the strict commit-message format. Ships `scripts/ai_commit.py`.
+- `staged-doc-naming/` — inserts lifecycle-stage tokens (`pm` / `dev` / `plan` / `case` / `case.data` / `实施纪要`) into derivative filenames. Ships `scripts/stage_naming.py`.
+- `list-git-repos/` — scans a directory tree and prints git repos as a pruned ASCII tree. Ships `docs/baseline.md` and a pytest suite under `tests/`; `scripts/list_git_repos.py` is implemented; the 5-test pytest suite is GREEN.
+- `plan-doc-sequence/` — generates the canonical 8-document planning sequence (001 raw + 002-005 pm/dev/plan/case + 006 impl + 007-008 audit/impl-note) in one shot. Ships `scripts/plan_doc_sequence.py` and a pytest suite under `tests/`.
+- `analysis-api/` — **documentation-driven** Java Spring Boot multi-module monorepo REST API call-chain analyzer. No `scripts/`, no `tests/`; ships four reference files under `references/` (`subagent-prompts.md`, `provider-index.md`, `report-template.md`, `case-study-2026-07-13-label-sync.md`) plus a behavior spec in `SKILL.md`.
 
 The user-facing index of skills lives in [`README.md`](README.md). When you add or change a skill, update that file in the same change.
 
@@ -21,32 +22,32 @@ The user-facing index of skills lives in [`README.md`](README.md). When you add 
 
 ```bash
 pytest                                              # all tests in the repo (root pytest.ini scopes testpaths)
-pytest plugins/neil-skills/list-git-repos/tests/ -v                     # one skill's suite
-pytest plugins/neil-skills/list-git-repos/tests/test_list_git_repos.py::test_worktree_link_file_not_misclassified_as_repo -v
+pytest list-git-repos/tests/ -v                     # one skill's suite
+pytest list-git-repos/tests/test_list_git_repos.py::test_worktree_link_file_not_misclassified_as_repo -v
 ```
 
-Root [`pytest.ini`](pytest.ini) sets `testpaths = plugins/neil-skills/list-git-repos/tests`. Each skill's `SKILL.md` is the source of truth for that skill's behavior 鈥?read it before touching anything in its directory.
+Root [`pytest.ini`](pytest.ini) sets `testpaths = git-commit-helper/tests list-git-repos/tests plan-doc-sequence/tests staged-doc-naming/tests`. Each skill's `SKILL.md` is the source of truth for that skill's behavior 鈥?read it before touching anything in its directory.
 
 ### Run a skill's script directly
 
 ```bash
-python plugins/neil-skills/staged-doc-naming/scripts/stage_naming.py "001.涓夋湀寮€鍙戦渶姹傝鏄?md" pm
-python plugins/neil-skills/staged-doc-naming/scripts/stage_naming.py --list-stages
-python plugins/neil-skills/staged-doc-naming/scripts/stage_naming.py --exists-check "/path/to/001.pm.x.md"
+python staged-doc-naming/scripts/stage_naming.py "001.涓夋湀寮€鍙戦渶姹傝鏄?md" pm
+python staged-doc-naming/scripts/stage_naming.py --list-stages
+python staged-doc-naming/scripts/stage_naming.py --exists-check "/path/to/001.pm.x.md"
 
-python plugins/neil-skills/git-commit-helper/scripts/ai_commit.py "feat(feature/login): 鏂板鐧诲綍鍔熻兘" \
+python git-commit-helper/scripts/ai_commit.py "feat(feature/login): 鏂板鐧诲綍鍔熻兘" \
     --feat-name "鐧诲綍鍔熻兘" \
     --body "- 鏂板 src/auth/login.ts锛屾牎楠岀敤鎴峰悕鏄惁瀛樺湪
 - 鏂板 src/auth/password.ts锛屾牎楠岀櫥褰曞瘑鐮佹槸鍚︽纭?
 
-python plugins/neil-skills/git-commit-helper/scripts/ai_commit.py --message-file MSG.txt
+python git-commit-helper/scripts/ai_commit.py --message-file MSG.txt
 ```
 
 No build step. No linter configured. No CI workflow. "Linting" happens by reading the skill's `SKILL.md` against its script 鈥?the script is the executable form of the spec.
 
 ## Architecture: Skill Directory Layout
 
-Every skill follows the same skeleton (see `plugins/neil-skills/staged-doc-naming/` as the canonical reference and `docs/superpowers/specs/2026-07-02-list-git-repos-design.md` 搂8 for the documented convention):
+Every skill follows the same skeleton (see `staged-doc-naming/` as the canonical reference and `docs/superpowers/specs/2026-07-02-list-git-repos-design.md` 搂8 for the documented convention):
 
 ```
 <skill-name>/
@@ -111,11 +112,20 @@ Filename shape: `{index}.{stage?}.{date}.{feat-name}.md`. Three rules agents for
 
 The single highest-drift step is **002.pm**: agents read the original requirement, spot open questions, and invent plausible answers so the doc looks complete. This is the #1 source of downstream 需求偏差. The script cannot enforce the no-assumption rule (it only emits filenames); the agent must stop, list the open questions, and take them back to the user before writing 002.pm.
 
+## Architecture: `analysis-api`
+
+The four script-driven skills above are drift-defense against agents that forget rules when the user pushes back. `analysis-api` solves the same problem with **documentation + reference assets** instead of an executable script, because the work it specifies — multi-step subagent dispatch for code tracing — is procedural and judgement-heavy, not amenable to a one-shot Python entry point. Its drift-defense sits in two layers:
+
+- **`SKILL.md`** carries the procedure: the 7-step method (entry-locator → module split → provider/mapper drill-down → MQ reverse-trace → outbound HTTP trace → main-process synthesis → Markdown report), target-stack assumptions (Java + RPC framework + MQ), subagent constraints (use code-index MCP, return structured signatures, never let one subagent span steps), and the **graceful-degradation rule** — when MQ destinations or cross-service boundaries are unclear, stop and ask the user instead of guessing (same principle as `plan-doc-sequence`'s 002.pm no-assumption rule).
+- **`references/`** carries the reusable assets a subagent agent needs to follow the spec without re-deriving the prompts: `subagent-prompts.md` ships 5 drop-in templates (entry-locator, per-module provider, MQ consumer tracer, etc.) with concrete code-index query patterns; `provider-index.md` ships a fillable module → RPC Provider table; `report-template.md` ships the report skeleton (frontmatter + Mermaid flowchart slots + per-step evidence section); `case-study-2026-07-13-label-sync.md` captures the lessons from the skill's first end-to-end run (e.g. step-1 overlap with step-2 prompted the redesign that split entry-locator from provider-listing).
+
+**Why no `scripts/` entry point and no pytest suite:** the work the skill drives is multi-agent orchestration with judgement calls (where to split modules, which MQ to follow, when to ask the user). Neither is expressible as a single CLI nor as a deterministic test — pytest would test the skill's prose, not the agent's behavior. The pytest-covered skills above have a thin, mechanical contract the script enforces; `analysis-api` has a thick, procedural contract the agent must read each invocation. Treat the `SKILL.md` + `references/` pair as its executable form.
+
 ## Repository Conventions
 
 ### Commit identity
 
-Git identity is **local to this repo** (`鍚村畤鏄?<wuyuchun@rainbowcn.com>`), not the global `Neil` default 鈥?see `MEMORY.md` for the local-vs-global rule. All AI-authored commits go through `plugins/neil-skills/git-commit-helper/scripts/ai_commit.py`, which appends `(Ai)` to the user.name and validates the message format. **Never push** 鈥?global rule from the user's `~/.claude/CLAUDE.md`.
+Git identity is **local to this repo** (`Neil <iwuyc@foxmail.com>`), overriding the global default `吴宇春 <wuyuchun@rainbowcn.com>` 鈥?see `MEMORY.md` for the local-vs-global rule. All AI-authored commits go through `git-commit-helper/scripts/ai_commit.py`, which appends `(Ai)` to the user.name and validates the message format. **Never push** 鈥?global rule from the user's `~/.claude/CLAUDE.md`.
 
 ### Commit message format
 
@@ -123,13 +133,16 @@ Git identity is **local to this repo** (`鍚村畤鏄?<wuyuchun@rainbowcn.com>`)
 
 ### Adding a new skill
 
-New skills go inside the marketplace bundle at `plugins/neil-skills/<skill-name>/` (so the Codex plugin manifest picks them up). Mirror `plugins/neil-skills/staged-doc-naming/`:
+New skills go at the **repo root** as a flat directory `<skill-name>/` (so Claude Code's skill loader finds the `SKILL.md`). Mirror `staged-doc-naming/` for the structure, then pick the artifact-style that fits:
 
-1. Create `plugins/neil-skills/<skill-name>/` with `SKILL.md` (frontmatter `name` + `description` + behavior spec).
-2. Place scripts under `plugins/neil-skills/<skill-name>/scripts/`, docs under `.../docs/`, tests under `.../tests/`.
+1. Create `<skill-name>/` with `SKILL.md` (frontmatter `name` + `description` + behavior spec).
+2. Pick **exactly one** artifact style:
+   - **Script-driven** (like `git-commit-helper`, `staged-doc-naming`, `list-git-repos`, `plan-doc-sequence`): place the executable under `scripts/`, the pytest suite under `tests/`. Every behavior the script enforces is pinned by a test case. Use this when the contract is **mechanical and deterministic** — filename format, regex, header validation, scan-and-prune.
+   - **Documentation-driven** (like `analysis-api/`): drop one `SKILL.md` plus reusable assets under `references/` (subagent prompt templates, fillable index structures, report skeletons, case-study lessons). Skip `scripts/` and `tests/`. Use this when the contract is **procedural and judgement-heavy** — multi-agent orchestration, call-chain tracing, anywhere the work splits across non-deterministic steps where pytest would test prose rather than behavior.
 3. If scripts need new constants lists (like `STAGE_TAGS`), update both the script and the SKILL.md table in the same commit.
-4. Add the skill to `README.md` under "Skills 列表" with path, triggers, and core rules.
+4. Add the skill to `README.md` under "Skills 列表" with path, triggers, and core rules, and append the new directory to the "目录结构" tree.
 5. If the skill goes through the original RED → GREEN TDD flow (spec first, then tests as the red contract, then implementation), follow the `list-git-repos` pattern: `docs/baseline.md` for the RED-phase drift record, `tests/` for the GREEN-phase pytest cases that pin every behavior the script must enforce. **Skills retro-tested in an audit pass do not need a `docs/baseline.md`** — there is no RED-phase history to record; only the pytest suite. Mark retro-tested skills by having only a `docs/.gitkeep` (so the directory still exists in the repo, for layout uniformity).
+6. **Documentation-driven skills skip items 5's pytest requirement** — they are pinned by their `SKILL.md` plus `references/` instead. A new documentation-driven skill still benefits from a case-study (`references/case-study-YYYY-MM-DD-<one-word>.md`) capturing what drift the spec was designed to prevent.
 
 ### Documents under `docs/`
 

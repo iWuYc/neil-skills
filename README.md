@@ -113,6 +113,33 @@ python plan-doc-sequence/scripts/plan_doc_sequence.py \
 python plan-doc-sequence/scripts/plan_doc_sequence.py --list-sequence
 ```
 
+### analysis-api
+
+- **路径**：`analysis-api/SKILL.md`
+- **触发场景**：当用户在 Java Spring Boot 多模块 monorepo 里要求分析 / 梳理 / trace 一个 REST 接口的完整调用链时使用（例如 "分析 /api/v1/xxx/sync 接口的整体流程"、"梳理 X 接口的调用链"、"trace the call flow of POST /xxx"）。覆盖 Controller → Service → RPC Provider → Service → Mapper → DB，以及 MQ 生产者 / 消费者、出站 HTTP（第三方 / 外部 API）调用，输出带 Mermaid 流程图的 Markdown 报告。触发词包含任何 "跨模块接口调用链 / 业务链路 / MQ 消息流" 梳理请求，即使是 "分析下这个接口" 或 "这个同步链路是怎么走的"。
+
+**核心规则**：
+
+1. **目标栈假定**：被分析的项目是 Java 后端 + RPC 框架（Dubbo / gRPC / Thrift）+ 消息队列（RabbitMQ / RocketMQ / Kafka）之一。如果不是，先确认项目栈再决定是否调整报告模板。
+2. **7 步法固定**：入口定位 → 模块拆分 → Provider / Mapper 下钻 → MQ 反向追踪 → 第三方 HTTP 追踪 → 主进程汇总 → 报告输出。每一步都有独立的 subagent 负责，**禁止**让一个 subagent 跨多步。
+3. **subagent 强制约束**：用代码索引 MCP（如 codegraph），禁止 grep/read 循环（除非代码索引不可用）；返回结构化的接口签名 / 实现类 / 表名 / XML 路径；不跨模块扩散；完成后只返结论 + 关键代码块，不返 agent metadata。
+4. **模糊边界优雅降级**：MQ 目的表 / 跨服务边界不清晰时，**停下回问用户**而不是凭直觉编造；与 `plan-doc-sequence` 的 002.pm 无假设规则属同一原则。
+5. **报告承载于 references/**：本 skill 没有可执行脚本，行为规范全部在 `SKILL.md`，可复用资产放在 `references/`（`subagent-prompts.md` 通用 Prompt 模板、`provider-index.md` 模块索引模板、`report-template.md` 报告模板、`case-study-2026-07-13-label-sync.md` 实战经验教训）。
+
+**使用方式**：
+
+按 `SKILL.md` 的 7 步法走；subagent 的具体 prompt 与报告骨架参考 `references/` 下的四个文件。
+
+```text
+Step 1: entry-locator subagent (references/subagent-prompts.md 模板 1)
+Step 2: per-module provider subagents (模板 2，按 modules 列表派发)
+Step 3: mq-consumer-tracer subagent (模板 3，反向追踪消费者)
+...
+最终报告：按 references/report-template.md 填充，并附 Mermaid flowchart
+```
+
+---
+
 ## 目录结构
 
 ```
@@ -142,6 +169,13 @@ neil-skills/
 │   ├── SKILL.md
 │   ├── scripts/plan_doc_sequence.py
 │   └── tests/test_plan_doc_sequence.py
+├── analysis-api/                                   # Java 接口调用链分析（文档驱动）
+│   ├── SKILL.md
+│   └── references/
+│       ├── subagent-prompts.md                     # 通用 subagent prompt 模板
+│       ├── provider-index.md                       # Provider 模块索引模板
+│       ├── report-template.md                      # 报告骨架模板
+│       └── case-study-2026-07-13-label-sync.md    # 实战经验教训
 ├── AGENTS.md                                       # Codex 引导入口（单行指针，正文指向 CLAUDE.md）
 └── CLAUDE.md                                       # 仓库指南的权威文档
 ```

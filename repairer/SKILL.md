@@ -21,7 +21,7 @@ description: Use when the user provides an issue list (a markdown issue doc, an 
 
 ---
 
-## 工作流（7 步）
+## 工作流（10 步，含 3 个 worktree 节点）
 
 ### 1. 定位 issue 源文件
 

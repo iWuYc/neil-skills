@@ -72,6 +72,26 @@ Read issue 文件，提取问题清单：
 - **明示 push 规则**：项目级 / 全局级（**默认禁止 push**）
 - **明示 issue 回写要求**：勾选 checklist + 追加「解决方案」段落 + commit hash
 
+### 3.5 准备 worktree（关键，物理隔离）
+
+**绝对不能在共享 working tree 上并行 dispatch subagent**——Git 会自动 recalc，让中途编辑的代码被覆盖或被错误地 include 进别人的 commit。物理隔离才能彻底解决并发 mutation 冲突。
+
+主 agent 在 dispatch subagent **之前**，为每个 issue 单独建一个 worktree：
+
+~~~markdown
+```bash
+# 对每个 issue 执行
+git worktree add <REPO_PARENT>/<REPO_NAME>-fix-<ISSUE_ID> -b <BASE_BRANCH>-fix-<ISSUE_ID> <BASE_BRANCH>
+```
+~~~
+
+- **路径模板**：`<REPO_PARENT>/<REPO_NAME>-fix-<ISSUE_ID>/`（与仓库同级，避免污染仓库根）
+- **分支命名**：`<BASE_BRANCH>-fix-<ISSUE_ID>`（如 `main-fix-P0-性能-图标`）
+- **示例**：仓库 `E:/Work/iWork/myrepo/`、issue `P0-性能-图标`、base 分支 `main` →
+  worktree 路径 `E:/Work/iWork/myrepo-fix-P0-性能-图标/`，分支 `main-fix-P0-性能-图标`
+
+**注意**：必须等所有 worktree 创建完成后再 dispatch subagent，避免抢跑。若某 issue ID 含路径不安全字符（`/`、空格等），用单下划线替换。
+
 ### 4. 并行 dispatch
 
 **单条消息里同时调 N 个 Agent**，每个 `run_in_background: true`，`subagent_type: general-purpose`。

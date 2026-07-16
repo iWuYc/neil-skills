@@ -92,6 +92,13 @@ git worktree add <REPO_PARENT>/<REPO_NAME>-fix-<ISSUE_ID> -b <BASE_BRANCH>-fix-<
 
 **注意**：必须等所有 worktree 创建完成后再 dispatch subagent，避免抢跑。若某 issue ID 含路径不安全字符（`/`、空格等），用单下划线替换。
 
+**占位符合成**：上面 `<REPO_PARENT>` / `<REPO_NAME>` / `<ISSUE_ID>` / `<BASE_BRANCH>` 是主 agent 用来执行 `git worktree add` 的低层参数；交给 subagent 时合成成单一字符串：
+
+- `<WORKTREE_PATH>` = `<REPO_PARENT>/<REPO_NAME>-fix-<ISSUE_ID>/`
+- 分支名 = `<BASE_BRANCH>-fix-<ISSUE_ID>`
+
+§4.5 merge 与 §5.5 cleanup 会再次用到 `<WORKTREE_PATH>` 与该分支名，主 agent 在 dispatch 之后把这两值记在 task 上下文里、不要再重算（避免 §3.5 的 ID 安全字符替换规则被 §4.5 漏掉）。
+
 ### 4. 并行 dispatch
 
 **单条消息里同时调 N 个 Agent**，每个 `run_in_background: true`，`subagent_type: general-purpose`。

@@ -120,8 +120,8 @@ SendMessage 一次性发 N 个 Agent 调用
 ```markdown
 你是修复 subagent。任务范围严格限定：**<ISSUE_ID>**（issue 文档 `<ISSUE_FILE>`）。
 
-工作目录：`<REPO_ROOT>`
-不要修改与本任务无关的文件、不要触碰其他 <N-1> 个任务的代码。
+工作目录：`<WORKTREE_PATH>`（已为你创建好的独立 git worktree，**不要 cd 回主仓库**）
+不要修改与本任务无关的文件、不要触碰其他 <N-1> 个任务的代码、**不要触碰其他 worktree 目录**。
 
 ## 问题
 <ISSUE_DESCRIPTION 引用块>
@@ -135,14 +135,14 @@ SendMessage 一次性发 N 个 Agent 调用
    - 作者走 local: `<NAME> <EMAIL>` + `(Ai)` 后缀（走 git-commit-helper skill）
    - 提交格式：`<type>(<BRANCH>): <中文描述>` + 中文 bullet body
    - **禁止 push**
+   - **不要尝试 merge 回主仓库**——这一步由主 agent 统一做
 
 ## 完成标准
 - <SPECIFIC_OUTCOME>
 - build 通过
-- 已 commit
-- 在 Obsidian issue 文档中对应「<ISSUE_ID>」一节下追加四级标题「解决方案」（用 obsidian CLI append），并在 issue 列表里勾选 `[x]`。
-
-把完成的修改列表、commit hash、build 结果、issue 标注状态回报给我。
+- 已 commit（commit 会留在 worktree 自己的分支上，**不要 push**）
+- **不要**操作 Obsidian issue 文档（回写统一由主 agent 收尾，避免 worktree 路径错位）
+- 把 commit hash + 修改文件清单 + build 结果回报给我
 ```
 
 ---

@@ -1,0 +1,74 @@
+{
+  "skill_name": "init-all",
+  "evals": [
+    {
+      "id": 1,
+      "eval_name": "mixed-projects-with-ambiguous-dir",
+      "prompt": "你位于一个父目录 `E:/Workspace/iWork/neil-skills/evals/sandboxes/eval-1-mixed`，里面有 3 个直接子项：\n- `frontend/`（含 package.json + .git + README.md）\n- `backend/`（含 pyproject.toml + .git + main.py）\n- `notes/`（只有 README.md，没 .git，没包管理文件）\n\n用户想给这个父目录 + 它的子工程都做一次 init。请按 init-all 技能把以下事做完：\n1. 扫描父目录的子项，区分\"明显是工程\"和\"不确定\"\n2. 用 AskUserQuestion 跟用户确认：哪些要 init、已有 CLAUDE.md 怎么处理、并发上限\n3. 派发子 agent 并行 init\n4. 父目录 init 一次，产出索引型总纲\n5. 给我一份完整的派发 + 总纲总结\n\n注意：用户已经告诉你的预先设定是【全部勾选 + 跳过策略 + 并发 5】——直接走流程，不必真的问用户。",
+      "expected_output": "frontend/、backend/、notes/ 三个子目录都跑过 init 流程；frontend 和 backend 产出 CLAUDE.md/AGENTS.md，notes 因被勾选也要 init（哪怕内容贫瘠）；父目录产出 CLAUDE.md/AGENTS.md 是索引型，含子工程路径表；噪音目录（如果有）未被 init。",
+      "files": [
+        "evals/sandboxes/eval-1-mixed/frontend",
+        "evals/sandboxes/eval-1-mixed/backend",
+        "evals/sandboxes/eval-1-mixed/notes"
+      ],
+      "expectations": [
+        "frontend/ 下生成 CLAUDE.md 或 AGENTS.md",
+        "backend/ 下生成 CLAUDE.md 或 AGENTS.md",
+        "notes/ 下生成 CLAUDE.md 或 AGENTS.md（被勾选后必须 init）",
+        "父目录 CLAUDE.md/AGENTS.md 存在且是索引型（列出子工程路径表，不抄子工程内容）",
+        "每个子工程的 init 工作在子目录内完成（不修改父目录或别的子工程）",
+        "派发是并行的（多条 Agent 调用在同一轮）"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "heavy-noise-blacklist-filtering",
+      "prompt": "你位于一个父目录 `E:/Workspace/iWork/neil-skills/evals/sandboxes/eval-2-noisy`，里面有 10 个直接子项：\n- 3 个工程：service-a/（Cargo.toml + .git）、service-b/（go.mod + .git）、service-c/（package.json + .git）\n- 2 个噪音：docs/（仅 README.md）、archive/（仅 data.csv）\n- 5 个黑名单目录：.obsidian/、node_modules/、.idea/、.vscode/、.git/\n\n用户想给这个父目录 + 它的子工程都做一次 init。请按 init-all 技能：\n1. 扫描父目录，剔除黑名单目录\n2. 把 service-a/b/c 标为 [AUTO]，docs/archive 标为 [ASK ]\n3. 用 AskUserQuestion 跟用户确认（预先设定：仅勾选 service-a/b/c，跳过策略，并发 3）\n4. 派发 3 个子 agent 并行 init\n5. 父目录 init 一次，产出索引型总纲\n\n注意：噪音目录（docs/archive）和黑名单目录都不应该被 init。",
+      "expected_output": "仅 service-a、service-b、service-c 三个子目录被 init；docs/、archive/ 及所有黑名单目录未被 init；父目录产出索引型 CLAUDE.md/AGENTS.md，路径表只列 3 个 service。",
+      "files": [
+        "evals/sandboxes/eval-2-noisy"
+      ],
+      "expectations": [
+        "service-a/ 下生成 CLAUDE.md 或 AGENTS.md",
+        "service-b/ 下生成 CLAUDE.md 或 AGENTS.md",
+        "service-c/ 下生成 CLAUDE.md 或 AGENTS.md",
+        "docs/ 下未生成 CLAUDE.md/AGENTS.md（未被勾选）",
+        "archive/ 下未生成 CLAUDE.md/AGENTS.md（未被勾选）",
+        ".obsidian/、node_modules/、.idea/、.vscode/ 等黑名单目录未被 init（也不出现在 AskUserQuestion 选项里）",
+        "父目录 CLAUDE.md/AGENTS.md 存在且是索引型"
+      ]
+    },
+    {
+      "id": 3,
+      "eval_name": "existing-claudemd-three-strategies",
+      "prompt": "你位于一个父目录 `E:/Workspace/iWork/neil-skills/evals/sandboxes/eval-3-existing-claudemd`，里面有 3 个直接子项：\n- `api/`（含 package.json + .git + 已有 CLAUDE.md，里面写着\"I customized this myself. Do not overwrite.\"）\n- `web/`（含 package.json + .git，无 CLAUDE.md）\n- `scripts/`（仅 README.md + build.sh，无 .git）\n\n用户想给这个父目录 + 它的子工程都做一次 init。请按 init-all 技能：\n1. 扫描父目录，识别候选\n2. 用 AskUserQuestion 跟用户确认（预先设定：全部勾选 + 跳过策略 + 并发 3）\n3. 派发子 agent。**关键：api/ 已有 CLAUDE.md 且用户选了跳过策略，子 agent 必须保留原文件，不能覆盖**\n4. 父目录 init 一次，产出索引型总纲\n5. api/CLAUDE.md 仍包含\"I customized this myself. Do not overwrite.\"",
+      "expected_output": "web/、scripts/ 被 init 并生成 CLAUDE.md/AGENTS.md；api/ 的 CLAUDE.md 保持原内容（不覆盖）；父目录生成索引型总纲。",
+      "files": [
+        "evals/sandboxes/eval-3-existing-claudemd"
+      ],
+      "expectations": [
+        "web/ 下生成 CLAUDE.md 或 AGENTS.md",
+        "scripts/ 下生成 CLAUDE.md 或 AGENTS.md",
+        "api/CLAUDE.md 内容未被修改（仍包含 'I customized this myself. Do not overwrite.'）",
+        "父目录 CLAUDE.md/AGENTS.md 存在且是索引型",
+        "AskUserQuestion 里出现过 3 选 1 策略问题（跳过/覆盖/逐个确认）"
+      ]
+    },
+    {
+      "id": 4,
+      "eval_name": "edge-case-ambiguous-dirs",
+      "prompt": "你位于一个父目录 `E:/Workspace/iWork/neil-skills/evals/sandboxes/eval-4-edge-cases`，里面有 6 个直接子项：\n- `valid-project/`（含 package.json + .git + README.md）\n- `almost-empty/`（只有 .keep）\n- `single-readme/`（只有 README.md）\n- `src-only/`（只有 src/index.js，无 package.json）\n- `.hidden-config/`（含 settings.json，是 dotfile 开头的目录）\n- `docs-only/`（仅 intro.md + setup.md）\n\n用户想给这个父目录 + 它的子工程都做一次 init。请按 init-all 技能：\n1. 扫描父目录，剔除以 . 开头的目录（.hidden-config 应被剔除）\n2. valid-project 标 [AUTO]；其他几个标 [ASK ]\n3. 用 AskUserQuestion 跟用户确认（预先设定：仅勾选 valid-project，跳过策略，并发 1）\n4. 派发 1 个子 agent init valid-project\n5. 父目录 init 一次，产出索引型总纲",
+      "expected_output": "仅 valid-project 被 init；其他 5 个子目录（almost-empty、single-readme、src-only、.hidden-config、docs-only）未被 init；.hidden-config 未出现在 AskUserQuestion 候选中（黑名单剔除）。",
+      "files": [
+        "evals/sandboxes/eval-4-edge-cases"
+      ],
+      "expectations": [
+        "valid-project/ 下生成 CLAUDE.md 或 AGENTS.md",
+        "almost-empty/、single-readme/、src-only/、docs-only/ 下未生成 CLAUDE.md/AGENTS.md（未被勾选）",
+        ".hidden-config/ 未出现在 AskUserQuestion 候选中（黑名单剔除）",
+        "父目录 CLAUDE.md/AGENTS.md 存在且是索引型（路径表只列 valid-project）",
+        "AskUserQuestion 至少列出了 4 个 [ASK ] 候选（almost-empty、single-readme、src-only、docs-only）"
+      ]
+    }
+  ]
+}

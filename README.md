@@ -138,6 +138,26 @@ Step 3: mq-consumer-tracer subagent (模板 3，反向追踪消费者)
 最终报告：按 references/report-template.md 填充，并附 Mermaid flowchart
 ```
 
+### init-all
+
+- **路径**：`init-all/SKILL.md`
+- **触发场景**：当用户在父目录里挂着多个并列子工程（"workspace" / "monorepo root" / "iWork" 风格的父目录），想要一次性把"父目录 + 所有子工程"都 onboard（即每个子工程各自生成 `CLAUDE.md` / `AGENTS.md`，父目录再生成一份索引型总纲），而不是只 init 父目录。触发词包含 "/init-all"、中文 "这个工作区全部 init 一下 / 父目录 + 所有子工程都 init / 把每个子工程都生成 CLAUDE.md / 顶层和子目录都跑一遍 init"。
+
+**核心规则**：
+
+1. **直接子项 only**：只看父目录的直接子项，禁止递归下钻——子工程内部的子目录由子 agent 各自处理。
+2. **黑名单剔除**（不展示、不询问）：`.` 开头的目录（`.obsidian` / `.git` / `.idea` / `.vscode` 等）+ 常见工具/构建目录（`node_modules` / `__pycache__` / `.venv` / `target` / `build` / `dist` / `out` / `.next` / `.nuxt` / `.parcel-cache` / `.turbo`）。
+3. **一次 AskUserQuestion 问齐 3 件事**：① 哪些子目录要 init（预填 [AUTO] 勾选 / [ASK ] 不勾选）；② 已有 `CLAUDE.md`/`AGENTS.md` 怎么办（推荐"跳过"——完全不动该目录；另支持"覆盖"或"逐个确认"）；③ 并发上限（默认 5）。
+4. **并行 dispatch 子 agent**：单条消息里多个 `Agent` 调用，每个子 agent 在其目标子目录里调 `init` skill（首选）或手写最小 `CLAUDE.md`/`AGENTS.md`（fallback）。**禁止**逐条 dispatch（会退化成串行）。
+5. **主 agent 兜底**：子 agent 报告"成功"后，主 agent 用 `ls <sub>/CLAUDE.md <sub>/AGENTS.md` 复核文件存在；缺了主 agent 立即手写兜底——v2 实测发现子 agent 可能谎报。
+6. **父总纲 = 索引型**（不抄子工程）：父 `CLAUDE.md`/`AGENTS.md` 只列工作区元信息 + 子工程相对路径表（`<sub>` → `<sub>/CLAUDE.md` / `<sub>/AGENTS.md` 链接），**禁止**在父总纲里复述任何子工程技术栈、入口路径、build/test 命令——这些信息属于子工程自己的 CLAUDE.md。写完必须做反摘要自检（grep `npm run` / `uvicorn` / `pytest` / `cargo run` / `go test` / `pip install` 等，命中就改写）。
+7. **跳过策略 = 完全不写新文件**：选"跳过"时若子工程已有 `CLAUDE.md`，整个目录**不能**新增 `AGENTS.md` 或任何文件——"补一个 AGENTS.md"也是污染。
+8. **不推荐 worktree 隔离**：v2 实测 `git worktree add -b init-all-X`（orphan 分支）不带源文件，子 agent 在空目录"成功"——v3 起禁止用 worktree 隔离，直接派子 agent 到源子目录。
+
+**使用方式**：
+
+按 `SKILL.md` 的 6 步法走（扫描 → AskUserQuestion → 并行 dispatch → 主 agent 兜底 → 父目录 init + 反摘要自检 → 收尾汇报）。子 agent 走 fallback 时直接用 `Bash` 跑 `ls` + `Read` 关键文件 + `Write` 最小内容。
+
 ---
 
 ## 目录结构
@@ -176,6 +196,9 @@ neil-skills/
 │       ├── provider-index.md                       # Provider 模块索引模板
 │       ├── report-template.md                      # 报告骨架模板
 │       └── case-study-2026-07-13-label-sync.md    # 实战经验教训
+├── init-all/                                       # 工作区批量 init：父目录 + 所有子工程（文档驱动）
+│   ├── SKILL.md
+│   └── evals/evals.json                            # 4 个 eval 用例
 ├── AGENTS.md                                       # Codex 引导入口（单行指针，正文指向 CLAUDE.md）
 └── CLAUDE.md                                       # 仓库指南的权威文档
 ```

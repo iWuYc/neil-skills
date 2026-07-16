@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Use when the user wants to pause an in-progress task and resume later in a future session — signals include "今天先到这 / 我先下了 / 明天接着做 / 留个交接文档 / save my context / create a handoff / 任务中断先存起来". Produces a single Markdown handoff file capturing the task goal, current progress, key decisions, open questions, next concrete steps, and a restart guide — so the next Claude (which has zero prior context) can pick up exactly where the current session left off. Distinct from session summary skills (which describe past work) and commit skills (which only capture git state). Also triggers proactively when context is running long on a multi-file, multi-commit task that isn't done.
+description: Use when the user wants to pause an in-progress task and resume later in a future session — signals include "今天先到这 / 我先下了 / 明天接着做 / 留个交接文档 / save my context / create a handoff / 任务中断先存起来". Default trigger is proactive — fires at two critical points (context near exhaustion / task nearly done with open tails), NOT in the middle of active work. Pause-style phrases ("暂停一下 / 等下回来 / brb") are explicitly excluded as triggers since they mean "5-minute break", not "session end". Produces a single Markdown handoff file capturing task goal, progress, decisions, open questions, next steps, and a restart guide so the next Claude (with zero prior context) can pick up exactly where the current session left off. Distinct from session summary skills and commit skills.
 ---
 
 # handoff
@@ -50,38 +50,60 @@ Step 4 — 收尾汇报（终端输出：路径 + 摘要 + 如何重启）
 
 ---
 
-## Step 0 — 中断信号识别
+## Step 0 — 触发判断（主动优先）
 
-### 用户主动触发
+> **核心策略**：本 skill 默认**主动触发**。AI 在上下文即将耗尽 / 任务接近完成时才问"要不要交接"。用户主动说"暂停一下"/"等下回来再说"这种 5 分钟休息词**不算触发**——必须用户明确说要中断会话、留交接文档才触发。
 
-识别以下任一信号即触发本 skill：
+### 触发模式 A：AI 主动触发（默认）
 
-| 中文信号 | 英文信号 | 强度 |
+**只在以下两个临界点之一同时满足时，才主动建议生成 handoff**：
+
+**临界点 1 — 上下文即将耗尽**（任一满足）：
+- 用户**连续**要求 AI 总结前文 ≥ 2 次（"总结下刚才我们做了什么"/"再帮我回顾一下"）
+- AI 已经反复重新读同一个文件 ≥ 3 次（自己都觉得"我先看下刚才那个文件"）
+- 工具结果累积导致响应变慢 / 输出截断 / 系统提示 token 紧张
+- 当前会话已 ≥ 30 轮，且未完成的任务跨 ≥ 3 个文件
+
+**临界点 2 — 任务接近完成但还有未关闭的尾巴**（任一满足）：
+- 已 commit 数 ≥ 3，git log 显示进度稳定推进
+- 当前改的文件已通过 lint / test 局部验证，但整体功能还没串起来
+- 用户已经把任务拆成 todo list 且 ≥ 70% 完成
+
+**两个临界点都满足 + 任务尚未全部完成** → 主动建议。话术模板：
+
+> "我们这个任务已经推进了相当多步（改了 N 个文件，做了 M 个 commit），上下文也累积了挺多。任务看起来接近完成了但还有未关闭的部分——**要不要我现在生成一份交接文档存到 `.handoff/`，下次接着干？** 如果今天能一鼓作气做完，咱们就继续。"
+
+**关键约束**：
+- 用户说"不用 / 继续 / 接着干" → 不生成，**本会话剩余时间内不再主动问**（最多只在每次 commit 后提一次"要不要现在生成？"）
+- 任务正在活跃推进时（AI 刚答完问题 / 用户刚发新指令 / 工具结果刚返回）**绝不触发**——只在"自然间隙"问
+- 用户最近一次 commit 距离现在 ≤ 5 分钟 → 也不触发（任务显然还在进行中）
+
+### 触发模式 B：用户主动触发（兜底）
+
+**只接收强信号词**——中信号词显式排除。
+
+**强信号词（立即触发）**：
+
+| 中文 | 英文 |
+|---|---|
+| 今天先到这儿 / 今天就到这儿 / 今天就到这 | let's stop for today / done for today |
+| 我先下了 / 我先走了 / 收工 / 回家了 | I'm signing off / I'm heading out |
+| 明天接着做 / 下次再弄 / 下次继续 | resume tomorrow / continue later / pick this up tomorrow |
+| 交接一下 / 留个交接文档 / 保存上下文 / 写个 handoff | handoff / save context / create a handoff doc |
+| 任务中断先存起来 / 这个先存一下 | park this task |
+
+**中信号词（**绝不触发**——用户只是 5 分钟休息，还要继续干）**：
+
+| 中文 | 英文 | 为什么排除 |
 |---|---|---|
-| 今天先到这儿 / 今天就到这儿 | let's stop for today | 强 |
-| 我先下了 / 我先走了 / 收工 | I'm signing off | 强 |
-| 明天接着做 / 下次再弄 | resume tomorrow / continue later | 强 |
-| 交接一下 / 留个交接文档 / 保存上下文 | handoff / save context | 强 |
-| 任务中断先存起来 | park this task | 强 |
-| 等下回来再说 | back in a bit | 中 |
-| 暂停一下 | pause | 中（可能只是 5 分钟） |
+| 暂停一下 / 等一下 | pause / hold on | 5 分钟休息，不是会话终止 |
+| 等下回来再说 / 一会儿回来 | back in a bit / be right back | 同上 |
+| 我去喝杯水 / 接个电话 | brb / grabbing coffee | 同上 |
 
-中信号如果用户继续在同一会话里操作就不触发；只有当用户**真的在收尾**时才触发。
-
-### AI 主动触发
-
-上下文管理判断（参考 [Anthropic Context Engineering](https://docs.anthropic.com)）：
-
-- 用户**连续**要求 AI 总结前文 ≥ 2 次
-- AI 已经反复重新读同一个文件 ≥ 3 次（"我先看下刚才那个文件"）
-- 工具结果累积导致响应变慢 / 输出截断
-- 任务跨 ≥ 5 个文件修改 + ≥ 2 个 commit，但还没完成
-
-**主动建议格式**：
-
-> "我们这个任务已经推进了相当多步（改了 7 个文件，做了 2 个 commit），上下文也越来越长。要不要我先生成一份交接文档存到 `.handoff/`，下次接着干？"
-
-如果用户同意 → 走完整 5 步法。如果用户说"不用 / 继续" → 不生成，但**在脑里记住下次该主动问**。
+**识别规则**：
+- 用户消息里出现**任一强信号词** → 立即触发 Step 1
+- 只有中信号词 → **完全不响应**，等用户回来继续；如果用户真要交接，他下次会说强信号词
+- 用户没说任何中断词 + 触发模式 A 也不满足 → 继续正常推进，不生成 handoff
 
 ---
 

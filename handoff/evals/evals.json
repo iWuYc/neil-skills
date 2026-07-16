@@ -32,14 +32,14 @@
     },
     {
       "id": 3,
-      "eval_name": "proactive-suggestion-on-long-task",
+      "eval_name": "proactive-only-at-critical-points",
       "prompt": "你帮用户在仓库 <cwd> 里完成一个跨 7 个文件、3 个 commit 的重构任务。已经对话 50 轮，工作区还 dirty（2 个文件改了一半）。用户没说要中断。\n\n请判断：现在应该主动建议生成 handoff 吗？给出你的建议话术（不实际生成 handoff）。",
-      "expected_output": "识别到满足 AI 主动触发条件（跨 ≥ 5 文件 + ≥ 2 commit + dirty + 长会话），主动建议生成 handoff。话术要包含理由（上下文累积、状态要保住），并询问用户是否同意。",
+      "expected_output": "v2 关键改进：v1 的 trigger 条件是「≥ 5 文件 + ≥ 2 commit」就建议——但 7 文件/3 commit 仍可能是任务活跃推进中，不该被打断。v2 要求两个临界点同时满足：① 上下文即将耗尽（≥ 30 轮对话 ✓）+ ② 任务接近完成但有未关闭尾巴（需 AI 进一步评估：todo 完成 ≥ 70% / 局部 lint+test 通过但功能未串 / ≥ 3 个 commit）。如果只有 ① 满足但 ② 不满足（任务还在活跃推进中），**不应该**主动建议。AI 应能区分两种场景：本例只满足 ① 但 ② 模糊——更安全的做法是不主动问，等用户明确说要中断。",
       "files": [],
       "expectations": [
-        "AI 主动建议生成 handoff",
-        "话术包含触发理由（context 累积 / dirty / commit 数 / 文件数）",
-        "话术询问用户是否同意，不擅自生成"
+        "AI 不主动建议生成 handoff（任务仍在活跃推进中）",
+        "AI 识别到'两个临界点都满足才触发'的条件本例不完全满足",
+        "AI 在响应中明确说明为何不主动建议（如'任务还在推进中，活跃 commit ≤ 5 分钟'或'上下文虽长但任务未接近完成'）"
       ]
     },
     {
@@ -65,6 +65,20 @@
         "AI 调用 AskUserQuestion 询问 Q1（写到哪儿）",
         "默认推荐全局 ~/.claude/handoffs/（因为 cwd 不在 git 仓库）",
         "列出至少 3 个选项（项目内 / 全局 / Obsidian）"
+      ]
+    },
+    {
+      "id": 6,
+      "eval_name": "mid-session-pause-must-not-trigger",
+      "prompt": "你正在帮用户在仓库 <cwd> 里写一个新功能。当前会话刚进行到第 8 轮，刚才在 src/auth/login.py:45 改完了一个函数，跑了测试还没通过。\n\n用户说：「暂停一下，我去喝杯水。」\n\n请按 handoff skill 判断是否应该触发。",
+      "expected_output": "v2 关键改进：v1 错误地把「暂停一下」「等下回来」当作可能触发信号。v2 明确——'暂停一下'/'等下回来'/'我去喝杯水' 都是中信号词（5 分钟休息），**绝不触发** handoff。AI 应该：① 不生成 handoff；② 不调用 AskUserQuestion；③ 简单回应用户（如'好的，我等你回来'）然后停在原地；④ 等用户回来后**继续当前任务**（不主动追讨未完成的事）。",
+      "files": [],
+      "expectations": [
+        "AI 不生成 handoff 文档",
+        "AI 不调用 AskUserQuestion",
+        "AI 回应用户'暂停'意图但明确不触发交接（如'好的，我等你回来'）",
+        "AI 不继续推进任务（不擅自做下一步动作）",
+        "AI 没有把'暂停一下'当作触发信号"
       ]
     }
   ]

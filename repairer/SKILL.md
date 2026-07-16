@@ -109,6 +109,35 @@ SendMessage 一次性发 N 个 Agent 调用
 
 监控完成通知即可，不要轮询。
 
+### 4.5 等待 + 顺序 merge（关键，按完成时间序）
+
+主 agent 监听所有 subagent 完成通知（每个 background run 的 task-notification 包含 `total_tokens` 和 `duration_ms`），按 **到达顺序** 逐个 merge 到 base 分支。无冲突的常规路径：
+
+~~~markdown
+```bash
+cd <REPO_ROOT>
+git -C <REPO_ROOT> merge --no-ff <BRANCH_NAME>
+```
+~~~
+
+`--no-ff` 强制产生 merge commit，保留分支历史，便于回滚单个 fix。
+
+**冲突处理：自动 rebase + fallback 问用户**
+
+1. merge 报错 → 主 agent 在该 worktree 里执行：
+   ~~~markdown
+   ```bash
+   git -C <WORKTREE_PATH> rebase <BASE_BRANCH>
+   ```
+   ~~~
+2. rebase 成功 → 回到主仓库再 merge 一次
+3. rebase 失败 → **停下**，用 AskUserQuestion 问用户：
+   - **丢弃该 fix**：删除 worktree + 分支，issue 标「未合并」
+   - **保留分支暂不合并**：保留 worktree 让用户手动处理
+   - **人工介入**：暂停流程，等用户指示
+
+**禁止在 merge 中途清理 worktree**——冲突回滚时需要原 worktree 仍在。所有 merge 成功（或全部解决）后才进入 §5.5 cleanup。
+
 ### 5. 收尾验证
 
 每个 subagent 回报后，做：

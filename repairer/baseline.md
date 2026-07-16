@@ -2,11 +2,11 @@
 
 > 本文件记录 skill 创建时的"基线假设"——即在没有 skill 时,AI 在用户说"请修复其中问题"时会自然犯哪些错。skill 的每条核心规则都是为了堵这些错而写。
 >
-> v1 创建:2026-07-16（10 个 baseline 假设）
+> v1 创建:2026-07-16（11 个 baseline 假设）
 
 ---
 
-## v1 baseline（10 条）
+## v1 baseline（11 条）
 
 ### Baseline 假设 1 — AI 把"修复一批问题"做成串行单 agent 串糖葫芦
 
@@ -108,6 +108,16 @@
 
 ---
 
+### Baseline 假设 11 — AI 让并行 subagent 共享 working tree 而非用 git worktree 隔离
+
+无 skill 时,AI 派 N 个 subagent 并行编码,共享 working tree。subagent A 还在改文件 X,subagent B 已经 commit 了文件 X,Git recalc 把 A 的未保存改动覆盖,或把 A 的中间态错误地 include 进 B 的 commit。
+
+**为什么错**:物理隔离才能真正解决并发 mutation 冲突;「文件白名单 + verify commit 顺序」只是缓解,无法应对 5+ 个并发 subagent 同时修改相互独立模块的边界文件。
+
+**skill 对应规则**:工作流 §3.5「准备 worktree(物理隔离)」+ §4 subagent cwd 指向 worktree + §5.5 清理 worktree + Subagent prompt 模板「工作目录: <WORKTREE_PATH>」。
+
+---
+
 ## GREEN phase:SKILL.md 的每条规则对应的 baseline 错
 
 | skill 规则 | 防的 baseline 错 |
@@ -122,6 +132,7 @@
 | 工作流 §5 收尾验证第 3 条 + 注意事项 §Issue 回写不能少 | Baseline 假设 8 |
 | §何时不要使用 第 1/2/3 条 | Baseline 假设 9 |
 | 注意事项 §单子 agent 回写位置要明确 + 模板完成标准 | Baseline 假设 10 |
+| §3.5 + §4.5 + §5.5 worktree 全流程 + Subagent prompt 模板 cwd | Baseline 假设 11 |
 
 ---
 
@@ -131,5 +142,7 @@
 - **跨 subagent API 对齐自检**:工作流 §5 第 3 条提到"抽查关键文件一致性",但没说"如何对 N 个 subagent 改动的同名 API 签名做交叉对比"——> 当 N ≥ 5 时人工抽查不可靠,未来可能需要一份"共享接口清单"事先给所有 subagent 看。
 - **issue 文档回写原子性**:5 个 subagent 同时往同一个 issue 文件追加,虽然段落互不重叠,但 `obsidian append` 在文件级是否有锁未知——> 需要在 eval-3 实测并发回写是否丢段。
 - **issue 源文件本身被列入 PROTECTED_FILES 怎么办**:用户给的 issue 路径是 `Obsidian/Vault/feedback/issue-001.md`,5 个 subagent 都必须追加它——这正好违反"文件范围互斥"原则,文档驱动式 skill 尚未规定 PROTECTED_FILES 例外清单的写法。
+
+> v2 更新:上一版 REFACTOR 中「working tree 共享」相关条目已被 §3.5/4.5/5.5 解决（如果存在过的话）。
 
 下次有人发现 baseline 假设 11+,请追加到本文件。

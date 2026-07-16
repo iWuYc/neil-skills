@@ -158,6 +158,35 @@ Step 3: mq-consumer-tracer subagent (模板 3，反向追踪消费者)
 
 按 `SKILL.md` 的 6 步法走（扫描 → AskUserQuestion → 并行 dispatch → 主 agent 兜底 → 父目录 init + 反摘要自检 → 收尾汇报）。子 agent 走 fallback 时直接用 `Bash` 跑 `ls` + `Read` 关键文件 + `Write` 最小内容。
 
+### handoff
+
+- **路径**：`handoff/SKILL.md`
+- **触发场景**：当用户要中断当前任务并把会话状态沉淀下来供下次恢复时使用（例如 "今天先到这儿 / 交接一下 / 我先下了 / 明天接着做 / 留个交接文档 / save my context / create a handoff / 任务中断先存起来"）。AI 在上下文即将耗尽、跨 ≥5 文件 + ≥2 commit 但任务未完成时也会**主动建议**生成 handoff。**与"工作总结 / 会议纪要 / 项目文档"严格区分**——handoff 必须是面向"零上下文的未来 AI 接着干"的剧本，不是回顾型摘要。
+
+**核心规则**：
+
+1. **强制 8 节骨架**：§1 元信息（时间/项目/分支/commit/工作区/未推送/会话ID） → §2 任务目标（含成功标准） → §3 当前进度（✅已完成 / 🔄进行中 / ⏳待开始） → §4 关键决策（每个含选项/选择/理由/**反悔条件**/位置） → §5 未决问题（❓ 标签） → §6 上下文文件路径（绝对路径 + 行号） → §7 下一步行动（每步可被下次 AI 直接执行） → §8 重启指南（6 步骤 + 不要做的事）。
+2. **Step 1 必用 AskUserQuestion 问齐 3 件事**：① 写到哪儿（项目内 `.handoff/` / 全局 `~/.claude/handoffs/` / Obsidian vault）；② 文件名 slug（任务主题 / 时间戳 / 序列号）；③ secrets 处理（默认**不包含**，引用路径代替）。
+3. **写路径不抄代码**：禁止把大段代码贴到 handoff，用 `<绝对路径>:line` 引用即可。复制粘贴会立刻让文档膨胀到 5000+ 行，浪费 token 且易过期。
+4. **不假定下次是同一个 AI**：避免"我们刚才……"这种主语，改成"任务背景：……"；文件名 / commit hash / 文件路径必须绝对路径。
+5. **secrets 零容忍**：API key / token / 密码 / 私钥 / `.env` 内容**绝不写**到 handoff。引用 `~/.config/xxx/credentials` 或 env var 名（如 `SK_PROD_TOKEN`）即可。Step 4 收尾汇报里 grep 自检 `sk-` / `password` / `token` / `Bearer `。
+6. **决策带反悔条件**：每个关键决策 §4 必须含"如果 X 变了 → 改成 Y"——下次 AI 才有依据判断是否要推翻。
+7. **未决问题独立成节**：§5 单独列，至少 1 个 ❓ 标签（即使为"无"，也要显式声明）。未决问题**禁止**埋进 §3 进度列表。
+8. **同名不覆盖**：默认同名 handoff 加 `-1` / `-2` 后缀，绝不覆盖已有内容。如要覆盖，用户必须在 Step 1 明确选。
+9. **gitignore 提醒**：项目内 `.handoff/` 默认应加到 `.gitignore`（handoff 是个人 session 上下文，不是项目文档）。skill 只提醒，不自动改 `.gitignore`。
+
+**使用方式**：
+
+按 `SKILL.md` 的 5 步法走（中断信号识别 → AskUserQuestion 三问 → inline 收集状态 → Write handoff → 收尾汇报）。`baseline.md` 记录了 RED 阶段预判的 10 个 AI 自然犯错点及对应堵漏规则；`evals/evals.json` 包含 5 个自测用例覆盖主动触发、secrets 处理、写入位置选择等关键场景。
+
+```text
+Step 0: 识别中断信号（用户主动 / AI 主动）
+Step 1: AskUserQuestion 问齐 3 件事（location / slug / secrets）
+Step 2: inline 收集状态（git/任务/进度/决策/未决/上下文/下一步/重启指南）
+Step 3: Write handoff 到目标路径（同名加 -1 后缀，不覆盖）
+Step 4: 收尾汇报（路径 + 摘要 + gitignore 提醒 + secrets 自检提醒）
+```
+
 ---
 
 ## 目录结构
@@ -199,6 +228,10 @@ neil-skills/
 ├── init-all/                                       # 工作区批量 init：父目录 + 所有子工程（文档驱动）
 │   ├── SKILL.md
 │   └── evals/evals.json                            # 4 个 eval 用例
+├── handoff/                                        # 任务中断交接文档（文档驱动）
+│   ├── SKILL.md
+│   ├── baseline.md                                 # RED 阶段预判的 10 个 baseline 错
+│   └── evals/evals.json                            # 5 个 eval 用例（主动触发/secrets/位置选择等）
 ├── AGENTS.md                                       # Codex 引导入口（单行指针，正文指向 CLAUDE.md）
 └── CLAUDE.md                                       # 仓库指南的权威文档
 ```

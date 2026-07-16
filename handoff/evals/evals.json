@@ -1,0 +1,71 @@
+{
+  "skill_name": "handoff",
+  "evals": [
+    {
+      "id": 1,
+      "eval_name": "explicit-stop-with-task-progress",
+      "prompt": "你正在帮用户做 `feat04-label-sync`：在 <cwd> 仓库里实现一个新功能。你已经：\n- 在分支 `feat/label-sync` 上 commit 了 2 次（commit hash abc1234, def5678）\n- 修改了 4 个文件（src/LabelService.java、src/LabelController.java、tests/LabelServiceTest.java、config/label.properties）\n- 当前正在 src/LabelService.java:120-145 写第三个方法 `mergeLabelConflict`（写了一半）\n- 还有 1 个未决问题：合并冲突时是覆盖还是跳过\n\n用户说：「今天先到这儿，明天接着做。先把交接文档写好」\n\n请按 handoff skill 把交接文档生成出来。",
+      "expected_output": "生成 .handoff/feat04-label-sync.md；包含 8 个章节；元信息包含 commit hash、git status；§5 未决问题列出合并冲突策略；§7 下一步具体到 `src/LabelService.java:120` 处继续 mergeLabelConflict 的逻辑；§8 重启指南包含 6 步骤。",
+      "files": [],
+      "expectations": [
+        "handoff 写到 .handoff/feat04-label-sync.md",
+        "§1 元信息含 commit hash (abc1234 或 def5678)",
+        "§3 当前进度含 ✅ 已完成（2 个 commit）和 🔄 进行中（mergeLabelConflict 写了一半）",
+        "§5 未决问题含 '合并冲突时是覆盖还是跳过' 这条 ❓ 项",
+        "§7 下一步行动引用了 src/LabelService.java 的具体位置",
+        "§8 重启指南含 '不要重读整个仓库' 或类似的负面约束",
+        "没有把 src/LabelService.java:120-145 的代码复制粘贴到 handoff 里",
+        "没有 secrets（如无 token / api key / password）"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "wrong-skill-trigger-distinguish-from-summary",
+      "prompt": "用户说：「我们今天开了个会，讨论了 Q3 OKR 的目标调整，达成了 3 个结论。帮我整理一下会议纪要。」\n\n这不是 handoff——这是会议纪要。但请判断：用户这个请求是 handoff skill 的触发场景吗？如果不是，应该推荐什么？",
+      "expected_output": "识别出这不是 handoff 场景（用户没说要中断任务、没说 resume tomorrow、handoff 至少要有一个'下一步行动'项），推荐用 internal-comms skill 或直接写普通会议纪要。",
+      "files": [],
+      "expectations": [
+        "AI 不直接生成 handoff 文档",
+        "AI 识别到 '会议纪要' ≠ '会话交接'",
+        "AI 推荐 internal-comms 或直接普通写作"
+      ]
+    },
+    {
+      "id": 3,
+      "eval_name": "proactive-suggestion-on-long-task",
+      "prompt": "你帮用户在仓库 <cwd> 里完成一个跨 7 个文件、3 个 commit 的重构任务。已经对话 50 轮，工作区还 dirty（2 个文件改了一半）。用户没说要中断。\n\n请判断：现在应该主动建议生成 handoff 吗？给出你的建议话术（不实际生成 handoff）。",
+      "expected_output": "识别到满足 AI 主动触发条件（跨 ≥ 5 文件 + ≥ 2 commit + dirty + 长会话），主动建议生成 handoff。话术要包含理由（上下文累积、状态要保住），并询问用户是否同意。",
+      "files": [],
+      "expectations": [
+        "AI 主动建议生成 handoff",
+        "话术包含触发理由（context 累积 / dirty / commit 数 / 文件数）",
+        "话术询问用户是否同意，不擅自生成"
+      ]
+    },
+    {
+      "id": 4,
+      "eval_name": "sensitive-info-redaction",
+      "prompt": "用户说：「今天先到这儿，把交接文档写好。」\n当前会话中 AI 刚帮用户调通了一个外部 API，收到了一个 token = `sk-prod-abc123def456ghi789jkl012mno345pqr678`，并且 AI 修改了 src/api/PaymentService.java 调用该 API。\n\n请按 handoff skill 生成交接文档。",
+      "expected_output": "生成 handoff 文档；提到调通了外部 API；但 token `sk-prod-abc...` 不应出现在文档里，应该用引用路径（如 'token 存于 env var SK_PROD_TOKEN' 或 '参见 ~/.config/payment/credentials'）。",
+      "files": [],
+      "expectations": [
+        "handoff 提到调通了外部 API",
+        "handoff 不包含实际 token 值 sk-prod-abc123def456ghi789jkl012mno345pqr678",
+        "handoff 用引用方式（如 env var 名或凭证文件路径）代替实际 token",
+        "收尾汇报里提醒 '不要在 handoff 里留 secrets'"
+      ]
+    },
+    {
+      "id": 5,
+      "eval_name": "must-ask-location-first",
+      "prompt": "用户的 cwd 是 `/tmp/scratch/throwaway-test`（不是 git 仓库）。用户说：「今天先到这儿，明天接着做。」\n\n请按 handoff skill 处理。",
+      "expected_output": "AI 在 Step 1 必用 AskUserQuestion 问 Q1（写到哪儿）。因为 cwd 不在 git 仓库里，默认推荐全局 ~/.claude/handoffs/，而不是项目内 .handoff/。",
+      "files": [],
+      "expectations": [
+        "AI 调用 AskUserQuestion 询问 Q1（写到哪儿）",
+        "默认推荐全局 ~/.claude/handoffs/（因为 cwd 不在 git 仓库）",
+        "列出至少 3 个选项（项目内 / 全局 / Obsidian）"
+      ]
+    }
+  ]
+}

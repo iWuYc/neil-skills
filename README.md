@@ -191,6 +191,37 @@ Step 3: Write handoff 到目标路径（同名加 -1 后缀，不覆盖）
 Step 4: 收尾汇报（路径 + 摘要 + gitignore 提醒 + secrets 自检提醒）
 ```
 
+### repairer
+
+- **路径**：`repairer/SKILL.md`
+- **触发场景**：当用户给出一份"问题清单"（Obsidian URL、markdown 路径、或口头枚举一组绑定到某个 commit / branch 的独立问题），希望一次性批量修完时使用 —— 读取 issue 文档、把每个问题切成独立作用域、单条消息并行 dispatch N 个 subagent、各自 fix + commit、最后回写到 issue 源文档的 checklist + 「解决方案」段落。触发词包括 "请修复其中问题 / fix issue 列表 / 修问题反馈 00X / 批量修复 / 每个问题都用独立的 subagent 修复"。天然搭档 `git-commit-helper`（每个 fix 一个 `(Ai)` commit）与 `obsidian-cli`（issue 文档读 / 写往返）。
+
+**核心规则**：
+
+1. **每个问题 = 一个 subagent + 一个 commit + 一段 issue 文档回写**：互不阻塞、互不干扰、上下文隔离。串行 N 轮 vs 并行单条消息派 N 个 Agent，时间差至少 N 倍。
+2. **文件范围必须互斥**：每个 subagent 的 prompt 必须显式列「白名单 + 黑名单」——`不要修改与本任务无关的文件、不要触碰其他 N-1 个任务的代码`。共享底座（API 暴露 / 镜像同步）由一个 subagent 顺带做，不让并行 fix 各自顺手加。
+3. **obsidian URL ≠ 磁盘真实路径**：先 Glob/Grep 在已知 vault 根目录下确认 issue 文件**唯一一份**；vault 可能存在副本（worktree / iCloud / OneDrive / Claude 隐式缓存），`obsidian read` 输出不一定等于磁盘真实文件。`obsidian append` 必须带 `file=<完整路径>`，不带可能写到 active file。
+4. **subagent 必须带 commit 规则**：每个 fix 必须按项目 CLAUDE.md / 全局 CLAUDE.md 走 `git-commit-helper`（author 加 `(Ai)` 后缀、header `type(branch): 中文描述`、body 是 `- ` 开头的 bullet）——subagent 不能凭直觉 `git commit -m "fix"`。
+5. **禁止 push 是全局默认**：所有 subagent 收到明确「**禁止 push**」指令；除非用户在主 agent 里显式说可以，否则不能 `git push` / `git push --force` / `gh pr merge`。
+6. **回写 issue 文档不能少**：subagent 自我回报"已完成"不等于 issue 已勾选 —— 主 agent 工作流 §5 必须用 `obsidian read` 或 `Read` 工具**重新读 issue 源文件**，确认 checklist `- [x]` + 「解决方案」段落齐全。
+7. **回写位置要明确到小节**：subagent prompt 必须写「用 `obsidian append file=<完整路径>` 在 `<具体小节>` 后追加」，不写「在 issue 文档里追加」（会被路由到文件末尾或 active file）。
+8. **何时不要用本 skill**：单 bug → 直接 Read + Edit + git-commit-helper；问题之间有强依赖（一个 fix 依赖另一个 fix 的产物）→ 单 agent 串行处理；用户没说要批量 / 多问题。
+9. **并行 ≠ 串糖葫芦**：并行 dispatch 的前提是「文件范围互斥 + 无运行时依赖」。如果 subagent 都在 `preload.js` 改 API 暴露，要么合并为一个 subagent，要么先暴露再写调用方（基础设施先行）。
+
+**使用方式**：
+
+按 `SKILL.md` 的 7 步法走（定位 issue → 读 issue 拆问题 → 设计 subagent 切分 → 并行 dispatch → 收尾验证 → 回写源文件 → 汇总回报）。`baseline.md` 记录了 RED 阶段预判的 10 个 AI 自然犯错点（串行单 agent / 共享工作区 / obsidian URL 直信 / 基础设施各自顺手做 / working tree 中间态 / commit 不带规则 / 顺手 push / subagent 自我汇报等于勾选 / 单 bug 误触发 / 回写位置模糊）；`evals/evals.json` 包含 5 个自测用例覆盖并行 dispatch 验证、vault 副本回问、单 bug 不触发、强依赖不并行、commit 身份 + push 禁令。
+
+```text
+Step 1: 定位 issue 源文件（Glob 验证唯一，不直信 obsidian URL）
+Step 2: 读 issue，拆问题（输出问题清单数组）
+Step 3: 设计 subagent 切分（白名单 + 黑名单 + commit 规则 + push 禁令 + 回写位置）
+Step 4: 单条消息并行 dispatch N 个 Agent（subagent_type: general-purpose, run_in_background: true）
+Step 5: 收尾验证（git log --oneline + git status + 抽查 API 一致性 + obsidian read 重新确认）
+Step 6: 回写源文件（- [ ] → - [x] + 「解决方案」四级标题段落）
+Step 7: 汇总回报（commit hash + 文件清单 + build/test 结果 + checklist 截图）
+```
+
 ---
 
 ## 目录结构
@@ -236,6 +267,10 @@ neil-skills/
 │   ├── SKILL.md
 │   ├── baseline.md                                 # RED 阶段预判的 10 个 baseline 错
 │   └── evals/evals.json                            # 5 个 eval 用例（主动触发/secrets/位置选择等）
+├── repairer/                                       # 批量修复 issue 列表（文档驱动）
+│   ├── SKILL.md
+│   ├── baseline.md                                 # RED 阶段预判的 10 个 baseline 错
+│   └── evals/evals.json                            # 5 个 eval 用例（并行/vault 副本/强依赖/commit 规则）
 ├── AGENTS.md                                       # Codex 引导入口（单行指针，正文指向 CLAUDE.md）
 └── CLAUDE.md                                       # 仓库指南的权威文档
 ```

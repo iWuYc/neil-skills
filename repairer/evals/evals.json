@@ -1,0 +1,75 @@
+{
+  "skill_name": "repairer",
+  "evals": [
+    {
+      "id": 1,
+      "eval_name": "parallel-dispatch-must-be-single-message",
+      "prompt": "用户给了一个 issue 文档路径 `E:/Workspace/iWork/neil-skills/evals/sandboxes/eval-1-parallel-dispatch/feedback/issue-001.md`,里面有 5 个互不依赖的问题:\n- P0-性能-图标:重建图标时主进程卡死(src/composables/useIcons.js)\n- P0-性能-列表:列表渲染 5000+ 项卡顿(src/components/ListView.vue)\n- P1-UX-主题:暗色主题下文本对比度低(src/styles/theme.css)\n- P1-UX-快捷键:快捷键冲突,Ctrl+S 触发两次(src/composables/useShortcut.js)\n- P2-文档-API:API 文档缺示例(docs/api.md)\n\n用户说:「请修复其中问题」\n\n请按 repairer skill 把这 5 个问题修完。",
+      "expected_output": "主 agent 在单条消息里同时调 5 个 Agent(并行 dispatch),每个 subagent 只动自己范围的 1-2 个文件,5 个 commit 各自带 (Ai) 后缀,issue 文档 5 项都勾选 [x] + 各追加「解决方案」段落。",
+      "files": [],
+      "expectations": [
+        "5 个 Agent 调用在同一条消息里发出(并行,不是串行 5 轮)",
+        "每个 subagent 的文件范围互斥(没有两个 subagent 改同一文件)",
+        "5 个 commit 各自带 (Ai) author 后缀",
+        "5 个 commit 都未触发 git push",
+        "issue 文档 5 项都从 [ ] 变为 [x]",
+        "issue 文档每项下都追加了「解决方案」段落",
+        "issue 文档回写位置在用户原始给的路径(Glob 验证唯一)"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "obsidian-url-must-verify-disk-uniqueness",
+      "prompt": "用户给了一个 obsidian URL: `obsidian://open?vault=iWorknote&file=feedback/issue-002-performance.md`。\n\n环境里 obsidian vault 在 `E:/Workspace/Note/iWorknote/`,但你发现 `E:/Workspace/iWork/neil-skills/evals/sandboxes/eval-2-vault-uniqueness/iWorknote/` 下也有一份同名副本(可能是 worktree / 缓存)。\n\n用户说:「请按这个 issue 修里面 3 个性能问题」\n\n请按 repairer skill 把这 3 个问题修完。",
+      "expected_output": "主 agent 在工作流 §1 必须先用 Glob/Grep 在已知 vault 根目录下确认 issue 文件的真实唯一路径。如果发现副本,主动告知用户两份路径存在差异、要求用户指定写入哪一份,不能凭直觉选一份就开干。",
+      "files": [],
+      "expectations": [
+        "AI 用 Glob 或 Grep 在 vault 根目录下搜索 issue-002-performance.md 的全部出现位置",
+        "AI 发现多份副本时,**停下回问用户**写入哪一份(不凭直觉选)",
+        "AI 不直接把 obsidian URL 解码的路径当唯一路径用",
+        "subagent 回写解决方案段落时,目标路径是用户确认的那一份(不是副本)"
+      ]
+    },
+    {
+      "id": 3,
+      "eval_name": "single-bug-must-not-trigger-skill",
+      "prompt": "用户说:「我刚才看了下,src/utils/dateFormat.js:42 那个 `formatDate` 函数少处理了时区,我加了个 `date-fns-tz` 但没在 package.json 里加上。帮我修一下。」\n\n请判断:这是 repairer skill 的触发场景吗?",
+      "expected_output": "识别出这不是 repairer 场景——只有 1 个问题、且范围明确(单文件 + package.json),应该直接走 Edit + git-commit-helper,不要启动并行 dispatch。",
+      "files": [],
+      "expectations": [
+        "AI 不启动 repairer 流程",
+        "AI 不派 subagent",
+        "AI 推荐直接 Read src/utils/dateFormat.js:42 + Edit 加依赖 + git-commit-helper commit",
+        "AI 说明「单 bug 用本 skill 是过度编排」"
+      ]
+    },
+    {
+      "id": 4,
+      "eval_name": "strong-dependency-must-not-parallel",
+      "prompt": "用户的 issue 文档里有 3 个问题:\n- P0-基础设施-1:在 preload.js 里暴露 `window.api.syncBookmark(url)` 给 renderer\n- P0-基础设施-2:在 preload.js 里暴露 `window.api.deleteBookmark(id)` 给 renderer\n- P0-调用方:在 renderer/components/BookmarkPanel.vue 里调用上面两个 API\n\n第 3 个问题强依赖前 2 个的产物(preload.js 必须先暴露 API,renderer 才能调)。\n\n用户说:「请按 repairer 修这 3 个问题」\n\n请按 repairer skill 把这 3 个问题修完。",
+      "expected_output": "AI 识别出第 3 个问题强依赖前 2 个,不能并行。处理方式:① 把前 2 个并行(它们互相不依赖),② 第 3 个等前 2 个 commit 后**串行**做。**不能 3 个全并行**(否则 renderer subagent 会找不到 API 暴露)。",
+      "files": [],
+      "expectations": [
+        "AI 识别出第 3 个问题与前 2 个有强依赖(API 必须先暴露)",
+        "AI 不直接 3 个并行 dispatch",
+        "AI 采用「2 并行 + 1 串行」或「3 全串行」策略,且解释清楚为什么",
+        "preload.js 的两个改动由两个 subagent 顺带做时不会冲突(同一文件!)——AI 应该合并为 1 个 subagent 顺带做两个 API 暴露",
+        "最终 3 个问题都修完,各自有独立 commit(但 preload 改动在 P0-基础设施-N 的 commit 里)"
+      ]
+    },
+    {
+      "id": 5,
+      "eval_name": "commit-identity-and-no-push-must-be-enforced",
+      "prompt": "用户给了一个 issue 文档,里面有 2 个互不依赖的问题:分别在 src/a.js 和 src/b.js。\n\n用户说:「请按 repairer 修这 2 个问题」\n\n仓库 cwd 是 `E:/Workspace/iWork/neil-skills/evals/sandboxes/eval-5-commit-rules/`,本仓库 commit 必须按 git-commit-helper skill 走(AI 后缀、禁止 push)。\n\n请按 repairer skill 把这 2 个问题修完。",
+      "expected_output": "2 个 subagent 各自 commit,author 字段带 (Ai) 后缀(如 `Neil (Ai) <iwuyc@foxmail.com>`),header 形如 `fix(...): 中文描述`,body 是 `- ` 开头的 bullet。**任何 subagent 都不能触发 git push**。",
+      "files": [],
+      "expectations": [
+        "2 个 commit 的 author 字段都带 (Ai) 后缀",
+        "2 个 commit 的 header 符合 `type(branch): 中文描述` 格式",
+        "2 个 commit 的 body 是 `- ` 开头的 bullet(中文)",
+        "git log 显示全程没有任何 push 动作(无 origin/HEAD 推进)",
+        "subagent 内部没有用 `git push` / `git push --force` / `gh pr merge` 等 outward-facing 命令"
+      ]
+    }
+  ]
+}

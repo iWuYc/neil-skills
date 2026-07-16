@@ -151,6 +151,25 @@ git -C <REPO_ROOT> merge --no-ff <BRANCH_NAME>
 - 抽查关键文件一致性（如不同 fix 涉及的同名 API 签名必须对齐）
 - 用 `obsidian read` 或 Read 工具**重新读 issue 源文件**，确认 checklist + 解决方案段落齐全
 
+### 5.5 清理 worktree（所有 merge 成功后执行）
+
+**所有 merge 完成后** 才统一清理。命令模板：
+
+~~~markdown
+```bash
+git worktree remove --force <WORKTREE_PATH>
+git branch -D <BRANCH_NAME>
+```
+~~~
+
+清理后必须验证：
+
+- `git worktree list` 只剩主仓库
+- `git branch` 不再含 `-fix-` 前缀的临时分支
+- 主仓库 `git status` 干净
+
+**例外**：§4.5 冲突处理时若用户选择「丢弃该 fix」或「保留分支暂不合并」，对应的 worktree 与分支按用户决定处理（丢弃→立即清理；保留→不清理，标记为「待用户手动处理」）。
+
 ### 6. 回写源文件（关键，踩坑过）
 
 **回写位置必须用 Glob 验证过的唯一路径**。踩坑案例：

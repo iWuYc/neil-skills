@@ -109,9 +109,11 @@ SendMessage 一次性发 N 个 Agent 调用
 
 监控完成通知即可，不要轮询。
 
-### 4.5 等待 + 顺序 merge（关键，按完成时间序）
+### 4.5 等待 + 顺序 merge（关键，按到达顺序）
 
-主 agent 监听所有 subagent 完成通知（每个 background run 的 task-notification 包含 `total_tokens` 和 `duration_ms`），按 **到达顺序** 逐个 merge 到 base 分支。无冲突的常规路径：
+主 agent 监听所有 subagent 完成通知（每个 background run 的 task-notification 包含 `total_tokens` 和 `duration_ms`），按 **到达顺序（spec §5.3 称"完成时间序"）** 逐个 merge 到 base 分支。无冲突的常规路径：
+
+**占位符**：`<REPO_ROOT>` / `<WORKTREE_PATH>` / `<BRANCH_NAME>` 见 §3.5「准备 worktree」的占位符定义与合成公式。
 
 ~~~markdown
 ```bash
@@ -130,6 +132,8 @@ git -C <REPO_ROOT> merge --no-ff <BRANCH_NAME>
    git -C <WORKTREE_PATH> rebase <BASE_BRANCH>
    ```
    ~~~
+
+> merge 进入冲突状态时,主仓库 HEAD 处于中间态(MERGE_HEAD 存在)。若用户在第 3 步选择「丢弃该 fix」,主 agent 必须先 `git merge --abort` 回干净状态再继续下一个 merge 或进入 §5.5 cleanup。
 2. rebase 成功 → 回到主仓库再 merge 一次
 3. rebase 失败 → **停下**，用 AskUserQuestion 问用户：
    - **丢弃该 fix**：删除 worktree + 分支，issue 标「未合并」

@@ -114,7 +114,7 @@
 
 **为什么错**:物理隔离才能真正解决并发 mutation 冲突;「文件白名单 + verify commit 顺序」只是缓解,无法应对 5+ 个并发 subagent 同时修改相互独立模块的边界文件。
 
-**skill 对应规则**:工作流 §3.5「准备 worktree(物理隔离)」+ §4 subagent cwd 指向 worktree + §5.5 清理 worktree + Subagent prompt 模板「工作目录: <WORKTREE_PATH>」。
+**skill 对应规则**:工作流 §3.5「准备 worktree(物理隔离)」+ §4.5 merge + §5.5 清理 worktree + Subagent prompt 模板「工作目录: <WORKTREE_PATH>」。
 
 ---
 

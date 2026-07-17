@@ -70,6 +70,24 @@
         "git log 显示全程没有任何 push 动作(无 origin/HEAD 推进)",
         "subagent 内部没有用 `git push` / `git push --force` / `gh pr merge` 等 outward-facing 命令"
       ]
+    },
+    {
+      "id": 6,
+      "eval_name": "worktree-isolation-must-be-enforced",
+      "prompt": "用户给了一个 issue 文档，里面有 5 个互不依赖的问题，分别动 5 个不同的文件。\n\n用户说：「请按 repairer 修这 5 个问题」\n\n请按 repairer skill 把这 5 个问题修完。",
+      "expected_output": "主 agent 在 dispatch 之前为每个 issue 建独立 worktree；5 个 subagent 在各自 worktree 编码 + commit；主 agent 按完成时间序 merge 全部 5 个分支到 base 分支；merge 全部完成后批量清理 worktree + 临时分支；主仓库最终干净且有 5 个新 commit。",
+      "files": [],
+      "expectations": [
+        "主 agent 在 dispatch subagent 之前为每个 issue 创建了独立 worktree",
+        "每个 subagent 的 cwd 是其 worktree 路径(不是仓库根)",
+        "5 个 commit 分别落在 5 个独立的 fix 分支上(不是直接 commit 在 base 分支)",
+        "主 agent 在所有 subagent 完成后按完成时间序逐个 merge 到 base 分支",
+        "merge 全部完成后,`git worktree list` 只剩主仓库、5 个临时 worktree 已被 `remove --force`",
+        "merge 全部完成后,5 个 fix-* 临时分支已被 `git branch -D` 删除",
+        "merge 全部完成后,主仓库 `git status` 干净",
+        "merge 全部完成后,主仓库 `git log --oneline -5` 显示 5 个新 commit 顺序与 subagent 完成时间序一致",
+        "全程没有任何 push 动作"
+      ]
     }
   ]
 }
